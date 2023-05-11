@@ -1,0 +1,42 @@
+name: "Build for PR"
+description: "Builds dotnet code webapi project and runs unit tests"
+
+inputs:
+  workdir:
+    description: "Working dir to run commands"
+    default: src/
+    required: false
+  project:
+    description: "Project to build"
+    required: true
+  configuration:
+    description: "Build configuration"
+    default: Debug
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+  - name: Setup .NET
+    uses: actions/setup-dotnet@v1
+    with:
+      dotnet-version: 7.0.x
+   
+  - name: Initialize CodeQL
+    uses: github/codeql-action/init@v2
+    with:
+     languages: csharp
+     config-file: ./.github/codeql/codeql-config.yml
+
+  - name: Restore dependencies
+    shell: bash
+    working-directory: ${{ inputs.workdir }}
+    run: dotnet restore ${{ inputs.project }}
+      
+  - name: Build
+    shell: bash
+    working-directory: ${{ inputs.workdir }}
+    run: dotnet build --no-restore ${{ inputs.project }} /p:UseSharedCompilation=false -c ${{ inputs.configuration }}
+
+  - name: Perform CodeQL Analysis
+    uses: github/codeql-action/analyze@v2

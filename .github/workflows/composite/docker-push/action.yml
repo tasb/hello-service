@@ -1,0 +1,63 @@
+name: "Build and push container image"
+description: "Builds and pushes a container image to a registry"
+
+inputs:
+  context:
+    description: "Context for docker build"
+    required: true
+  registry:
+    description: "Registry server to push container image"
+    required: true
+  registry-username:
+    description: "Registry to push container image"
+    default: "${{ github.actor }}"
+    required: false
+  dockerfile:
+    description: "Dockerfile to use. Default: inputs.context/Dockerfile"
+    required: false
+    default: "Dockerfile"
+  image-tag:
+    description: "Tag for container image"
+    required: true
+  github-token:
+    description: "Add GITHUB_TOKEN to compilation"
+    required: false
+    default: "dummy"
+
+runs:
+  using: "composite"
+  steps:
+  - name: Log in to the Container registry
+    uses: docker/login-action@v2
+    with:
+      registry: ${{ inputs.registry }}
+      username: ${{ inputs.registry-username }}
+      password: ${{ inputs.github-token }}
+
+  - name: Build image
+    working-directory: ./src
+    shell: bash
+    run: |
+      docker build ${{ inputs.context }} --build-arg GITHUB_TOKEN=${{ inputs.github-token }} --file "${{ inputs.context }}/${{ inputs.dockerfile }}" --tag ${{ inputs.image-tag }}
+
+  - name: Run Trivy vulnerability scanner
+    uses: aquasecurity/trivy-action@master
+    with:
+      scan-type: image
+      image-ref: ${{ inputs.image-tag }}
+      format: 'sarif'
+      output: 'trivy-results.sarif'
+      hide-progress: false
+      exit-code: '1'
+      ignore-unfixed: true
+      severity: 'CRITICAL,HIGH'
+
+  - name: Upload Trivy scan results to GitHub Security tab
+    if: always()
+    uses: github/codeql-action/upload-sarif@v2
+    with:
+      sarif_file: 'trivy-results.sarif'
+
+  - name: Push image
+    shell: bash
+    run: docker push ${{ inputs.image-tag }}

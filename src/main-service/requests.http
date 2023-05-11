@@ -1,0 +1,9 @@
+### GET healthcheck
+GET http://localhost:5257/healthcheck
+
+
+### GET hello
+GET http://localhost:5257/api/v1
+
+### GET error
+GET http://localhost:5257/api/v1sdsd
